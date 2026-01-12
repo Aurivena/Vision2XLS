@@ -1,4 +1,4 @@
-package app.model;
+package app.core;
 
 import javax.imageio.ImageIO;
 import java.awt.*;

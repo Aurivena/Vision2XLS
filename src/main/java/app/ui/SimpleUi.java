@@ -1,5 +1,6 @@
 package app.ui;
 
+import app.core.AIPreprocessor;
 import javafx.application.Application;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -10,10 +11,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -31,10 +28,13 @@ public class SimpleUi extends Application {
     private Label statusLabel;
     private ProgressBar progressBar;
     private Label fileCountLabel;
+    private AIPreprocessor aiPreprocessor;
 
     @Override
     public void start(Stage primaryStage) {
-        primaryStage.setTitle("LMS Vision 2.0 Pro");
+        primaryStage.setTitle("Vision2XLS");
+
+        aiPreprocessor = new AIPreprocessor();
 
         // --- SIDEBAR ---
         VBox sidebar = new VBox(25);
@@ -42,11 +42,11 @@ public class SimpleUi extends Application {
         sidebar.setPrefWidth(300);
 
         // Логотип
-        Label logoLabel = new Label("Vision Parser");
+        Label logoLabel = new Label("Vision2XLS");
         logoLabel.getStyleClass().add("logo-text");
 
         HBox badgeBox = new HBox();
-        Label versionBadge = new Label("v2.0 Beta");
+        Label versionBadge = new Label("v2.2.8");
         versionBadge.getStyleClass().add("badge");
         badgeBox.getChildren().add(versionBadge);
 
@@ -84,9 +84,13 @@ public class SimpleUi extends Application {
         sidebar.getChildren().addAll(
                 logoBox,
                 sourceHeader, selectFilesBtn, fileCountLabel,
-                new Region() {{ setMinHeight(10); }},
+                new Region() {{
+                    setMinHeight(10);
+                }},
                 excelHeader, selectExcelBtn, excelList,
-                new Region() {{ setMinHeight(10); }},
+                new Region() {{
+                    setMinHeight(10);
+                }},
                 processBtn
         );
 
@@ -168,6 +172,17 @@ public class SimpleUi extends Application {
             }
         });
 
+        Thread initThread = new Thread(() -> {
+            try {
+                aiPreprocessor.init();
+                System.out.println("start");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        initThread.setDaemon(true);
+        initThread.start();
+
         String cssData = "data:text/css;base64," + Base64.getEncoder().encodeToString(MODERN_CSS.getBytes(StandardCharsets.UTF_8));
         scene.getStylesheets().add(cssData);
 
@@ -201,9 +216,18 @@ public class SimpleUi extends Application {
             this.uploadTime = new SimpleStringProperty(time);
             this.status = new SimpleStringProperty(st);
         }
-        public String getFileName() { return fileName.get(); }
-        public String getUploadTime() { return uploadTime.get(); }
-        public String getStatus() { return status.get(); }
+
+        public String getFileName() {
+            return fileName.get();
+        }
+
+        public String getUploadTime() {
+            return uploadTime.get();
+        }
+
+        public String getStatus() {
+            return status.get();
+        }
     }
 
     // --- CSS: The RTX 5090 Edition ---
@@ -216,7 +240,7 @@ public class SimpleUi extends Application {
                 -fx-focus-color: transparent;
                 -fx-faint-focus-color: transparent;
             }
-
+            
             /* SIDEBAR */
             .sidebar {
                 -fx-background-color: #ffffff;
@@ -243,7 +267,7 @@ public class SimpleUi extends Application {
                 -fx-padding: 0 0 5 0;
                 -fx-text-transform: uppercase;
             }
-
+            
             /* BUTTONS */
             .btn-secondary {
                 -fx-background-color: #ffffff;
@@ -276,7 +300,7 @@ public class SimpleUi extends Application {
                 -fx-background-color: linear-gradient(to right, #1d4ed8, #2563eb);
                 -fx-scale-y: 1.02; /* Subtle pop */
             }
-
+            
             /* MAIN AREA & CARD */
             .main-area {
                 -fx-padding: 40 50;
@@ -314,7 +338,7 @@ public class SimpleUi extends Application {
                 -fx-font-size: 12px;
                 -fx-font-weight: bold;
             }
-
+            
             /* TABLE VIEW - THE CLEAN LOOK */
             .table-view {
                 -fx-background-color: white;

@@ -1,6 +1,5 @@
 package app;
 
-
 import app.ui.SimpleUi;
 
 public class Main {
