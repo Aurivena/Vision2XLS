@@ -1,7 +1,6 @@
 package app.model;
 
-import java.nio.file.Path;
-import java.util.Set;
+import java.io.File;
 
-public record Task(Set<String> fields, Path file) {
+public record Task(File[] images, File excelFile) {
 }

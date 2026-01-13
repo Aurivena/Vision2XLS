@@ -1,6 +1,6 @@
 package app;
 
-import app.ui.SimpleUi;
+import app.view.SimpleUi;
 
 public class Main {
     public static void main(String[] args) {

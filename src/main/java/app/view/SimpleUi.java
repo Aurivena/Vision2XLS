@@ -1,6 +1,6 @@
-package app.ui;
+package app.view;
 
-import app.core.AIPreprocessor;
+import app.model.AIPreprocessor;
 import javafx.application.Application;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;

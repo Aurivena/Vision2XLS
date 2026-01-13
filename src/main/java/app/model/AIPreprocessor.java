@@ -1,4 +1,4 @@
-package app.core;
+package app.model;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public class AIPreprocessor {
@@ -15,10 +16,11 @@ public class AIPreprocessor {
     private final String port = "8081";
 
     public void init() throws IOException, InterruptedException {
-        int threads = Runtime.getRuntime().availableProcessors();
-        threads = Math.min(threads, 8);
+        int totalCores = Runtime.getRuntime().availableProcessors();
+        int safeThreads = Math.max(1, totalCores - 1);
+        safeThreads = Math.min(safeThreads, 8);
 
-        ProcessBuilder pb = getProcessBuilder(threads);
+        ProcessBuilder pb = getProcessBuilder(safeThreads);
 
         serverProcess = pb.start();
 
@@ -60,7 +62,7 @@ public class AIPreprocessor {
                 "--host", host,
                 "--port", port,
                 "--threads", String.valueOf(threads),
-                "--n-gpu-layers", "1"
+                "--n-gpu-layers", "0"
         );
 
         pb.directory(binDir);
