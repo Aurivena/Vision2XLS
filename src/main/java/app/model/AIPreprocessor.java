@@ -7,7 +7,6 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public class AIPreprocessor {
@@ -80,7 +79,7 @@ public class AIPreprocessor {
     }
 
     private boolean waitForServerReady() {
-        int maxSecond = 60;
+        int maxSecond = 120;
         for (int i = 0; i < maxSecond; i++) {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(host + ":" + port + "/health").openConnection();

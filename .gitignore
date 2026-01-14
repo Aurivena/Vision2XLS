@@ -5,6 +5,8 @@ build/
 !**/src/test/**/build/
 .kotlin
 
+llama.cpp/
+
 ### IntelliJ IDEA ###
 .idea
 .idea/modules.xml

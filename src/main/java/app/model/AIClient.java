@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -20,7 +21,7 @@ public class AIClient {
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ExecutorService executor = Executors.newFixedThreadPool(1);
 
-    public List<String> analyze(File[] images) throws IOException {
+    public List<String> analyze(List<File> images, String[] columns) throws IOException {
         List<CompletableFuture<String>> futures = new ArrayList<>();
 
         for (File image : images) {
@@ -29,7 +30,7 @@ public class AIClient {
             CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
                 try {
                     String base64 = Base64.getEncoder().encodeToString(imagesBytes);
-                    return send(createJsonBody(base64));
+                    return send(createJsonBody(base64, columns));
                 } catch (Exception e) {
                     System.err.println("Ошибка обработки файла " + image.getName() + ": " + e.getMessage());
                     return "Error" + image.getName();
@@ -60,7 +61,11 @@ public class AIClient {
     }
 
 
-    private String createJsonBody(String image) {
+    private String createJsonBody(String image, String[] columns) {
+        String columnsJsonStructure = Arrays.stream(columns)
+                .map(col -> "\"" + col + "\": \"значение\"")
+                .collect(Collectors.joining(",\n"));
+
         return String.format(
                 "{" +
                         "\"messages\": [" +
@@ -82,7 +87,7 @@ public class AIClient {
                         "Проанализируй изображение и верни ТОЛЬКО валидный JSON без Markdown-разметки (```json ... ```).\n" +
                         "Структура JSON должна быть такой:\n" +
                         "{\n" +
-                        "бла бла " +
+                        columnsJsonStructure +
                         "}\n" +
                         "\n" +
                         "Если поле не найдено или неразборчиво, ставь null."),
