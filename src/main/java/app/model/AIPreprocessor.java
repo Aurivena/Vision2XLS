@@ -14,7 +14,7 @@ public class AIPreprocessor {
     private final String host = "127.0.0.1";
     private final String port = "8081";
 
-    public void init() throws IOException, InterruptedException {
+    public void init() throws IOException {
         int totalCores = Runtime.getRuntime().availableProcessors();
         int safeThreads = Math.max(1, totalCores - 1);
         safeThreads = Math.min(safeThreads, 8);

@@ -26,6 +26,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     implementation("org.apache.poi:poi-ooxml:5.5.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.20.1")
 }
 
 tasks.test {

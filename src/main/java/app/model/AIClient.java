@@ -1,5 +1,9 @@
 package app.model;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -7,10 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,20 +21,21 @@ public class AIClient {
     private final String endpoint = "http://127.0.0.1:8081/v1/chat/completions";
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ExecutorService executor = Executors.newFixedThreadPool(1);
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    public List<String> analyze(List<File> images, String[] columns) throws IOException {
-        List<CompletableFuture<String>> futures = new ArrayList<>();
+    public List<AnalysisResult> analyze(List<File> images, Map<Integer, String> columns) {
+        List<CompletableFuture<AnalysisResult>> futures = new ArrayList<>();
 
         for (File image : images) {
-            byte[] imagesBytes = Files.readAllBytes(image.toPath());
-
-            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            CompletableFuture<AnalysisResult> future = CompletableFuture.supplyAsync(() -> {
                 try {
+                    byte[] imagesBytes = Files.readAllBytes(image.toPath());
                     String base64 = Base64.getEncoder().encodeToString(imagesBytes);
-                    return send(createJsonBody(base64, columns));
+                    String jsonString = send(createJsonBody(base64, columns));
+                    return new AnalysisResult(image.getName(), parseResponse(jsonString, columns));
                 } catch (Exception e) {
                     System.err.println("Ошибка обработки файла " + image.getName() + ": " + e.getMessage());
-                    return "Error" + image.getName();
+                    return new AnalysisResult(image.getName(), "Error: " + e.getMessage());
                 }
             }, executor);
             futures.add(future);
@@ -43,6 +45,42 @@ public class AIClient {
                 .collect(Collectors.toList());
     }
 
+    private Map<Integer, String> parseResponse(String jsonString, Map<Integer, String> columns) {
+        Map<Integer, String> result = new HashMap<>();
+        if (jsonString == null || jsonString.isEmpty()) return result;
+
+        String cleanJson = jsonString.trim();
+        if (cleanJson.startsWith("```json")) {
+            cleanJson = cleanJson.replace("```json", "").replace("```", "").trim();
+        } else if (cleanJson.startsWith("```")) {
+            cleanJson = cleanJson.replace("```", "").trim();
+        }
+
+        if (!cleanJson.startsWith("{")) {
+            System.err.println("AI отказался работать. Ответ: " + cleanJson);
+            return new HashMap<>();
+        }
+
+        try {
+            Map<String, String> rawMap = mapper.readValue(jsonString, new TypeReference<>() {
+            });
+
+            for (Map.Entry<Integer, String> entry : columns.entrySet()) {
+                Integer realIndex = entry.getKey();
+                String colName = entry.getValue();
+
+                if (rawMap.containsKey(colName)) {
+                    String val = rawMap.get(colName);
+                    if (val != null) {
+                        result.put(realIndex, val);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ошибка парсинга JSON от AI: " + e.getMessage() + "\nОтвет был: " + jsonString);
+        }
+        return result;
+    }
 
     private String send(String jsonBody) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
@@ -61,14 +99,18 @@ public class AIClient {
     }
 
 
-    private String createJsonBody(String image, String[] columns) {
-        String columnsJsonStructure = Arrays.stream(columns)
-                .map(col -> "\"" + col + "\": \"значение\"")
+    private String createJsonBody(String imageBase64, Map<Integer, String> columns) {
+        String structurePrompt = columns.values().stream()
+                .map(name -> String.format("\"%s\": \"<значение>\"", name))
                 .collect(Collectors.joining(",\n"));
 
         return String.format(
                 "{" +
                         "\"messages\": [" +
+                        "{" +
+                        "\"role\": \"system\"," +
+                        "\"content\": \"Ты — строгий JSON-генератор. Твоя единственная задача — извлечь данные из картинки.\" " +
+                        "}," +
                         "{" +
                         "\"role\": \"user\"," +
                         "\"content\": [" +
@@ -81,17 +123,12 @@ public class AIClient {
                         "\"max_tokens\": 500" +
                         "}",
                 escapeJson("" +
-                        "Ты — экспертная система OCR и анализа технической документации. \n" +
-                        "Твоя задача — извлечь данные из предоставленного изображения.\n" +
-                        "Текст может быть рукописным. Будь внимателен к цифрам, датам и галочкам. Если видишь КРЕСТ, то ставь null" +
-                        "Проанализируй изображение и верни ТОЛЬКО валидный JSON без Markdown-разметки (```json ... ```).\n" +
-                        "Структура JSON должна быть такой:\n" +
-                        "{\n" +
-                        columnsJsonStructure +
-                        "}\n" +
-                        "\n" +
-                        "Если поле не найдено или неразборчиво, ставь null."),
-                image
+                        "Проанализируй изображение. Верни ТОЛЬКО валидный JSON.\n" +
+                        "ЗАПРЕЩЕНО: писать вступления, извиняться, использовать Markdown (```json).\n" +
+                        "Только сырой JSON. Если данные не найдены — ставь пустую строку.\n" +
+                        "Структура ответа ОБЯЗАНА быть такой:\n" +
+                        "{\n" + structurePrompt + "\n}\n"),
+                imageBase64
         );
     }
 
@@ -99,15 +136,13 @@ public class AIClient {
         return text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 
-    private String extractContent(String json) {
-        String marker = "\"content\": \"";
-        int start = json.indexOf(marker);
-        if (start == -1) return json;
-        int end = json.indexOf("\"", start + marker.length());
-        return json.substring(start + marker.length(), end).replace("\\n", "\n");
-    }
-
-    public void shutdown() {
-        executor.shutdown();
+    private String extractContent(String fullJsonResponse) {
+        try {
+            JsonNode root = mapper.readTree(fullJsonResponse);
+            return root.path("choices").get(0).path("message").path("content").asText();
+        } catch (Exception e) {
+            System.err.println("CRITICAL: Не удалось найти content в ответе: " + fullJsonResponse);
+            return "";
+        }
     }
 }

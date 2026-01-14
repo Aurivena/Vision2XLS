@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class ExcelService {
 
@@ -32,21 +33,23 @@ public class ExcelService {
         return result;
     }
 
-    public void updateCell(File file, int rowIndex, int colIndex, String newValue) throws IOException {
-        try (Workbook workbook = WorkbookFactory.create(file)) {
+    public void appendRow(File file, Map<Integer, String> columnData) throws IOException {
+        try (FileInputStream fis = new FileInputStream(file);
+             Workbook workbook = WorkbookFactory.create(fis)) {
             Sheet sheet = workbook.getSheetAt(0);
 
-            Row row = sheet.getRow(rowIndex);
-            if (row != null) {
-                row = sheet.createRow(rowIndex);
+            int lastRowIndex = sheet.getLastRowNum();
+
+            if (sheet.getPhysicalNumberOfRows() > 0) {
+                lastRowIndex++;
             }
 
-            Cell cell = row.getCell(colIndex);
-            if (cell == null) {
-                cell = row.createCell(colIndex);
-            }
+            Row row = sheet.createRow(lastRowIndex);
 
-            cell.setCellValue(newValue);
+            for (Map.Entry<Integer, String> entry : columnData.entrySet()) {
+                Cell cell = row.createCell(entry.getKey());
+                cell.setCellValue(entry.getValue());
+            }
 
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 workbook.write(fos);
