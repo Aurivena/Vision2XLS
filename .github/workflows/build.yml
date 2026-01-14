@@ -1,4 +1,4 @@
-name: Build Windows Exe
+name: Build Windows EXE (Gradle)
 
 on:
   push:
@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ./Vision2XLS
 
     steps:
       - uses: actions/checkout@v3
@@ -16,48 +19,45 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
-      # 1. Качаем LLAMA для WINDOWS (AVX2 версия, самая ходовая)
-      - name: Download Llama.cpp for Windows
+      - name: Download Llama Windows
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://github.com/ggerganov/llama.cpp/releases/download/b4497/llama-b4497-bin-win-avx2-x64.zip" -OutFile "llama.zip"
-          Expand-Archive -Path "llama.zip" -DestinationPath "bin"
-          # Также нужна модель. В GitHub Actions качать 2ГБ модель каждый раз — плохая идея (долго).
-          # Лучше, чтобы пользователь скачал её сам, либо кэшировать. 
-          # НО для теста создадим пустой файл, чтобы сборка не упала, если ты проверяешь наличие файла.
-          New-Item -Path "bin/Qwen2-VL-2B-Instruct-Q4_K_M.gguf" -ItemType File
-          New-Item -Path "bin/mmproj-Qwen2-VL-2B-Instruct-f16.gguf" -ItemType File
+          Invoke-WebRequest -Uri "https://github.com/ggerganov/llama.cpp/releases/download/b4497/llama-b4497-bin-win-avx2-x64.zip" -OutFile "../llama-win.zip"
+          Expand-Archive -Path "../llama-win.zip" -DestinationPath "../bin-win"
 
-      # 2. Собираем JAR
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      - name: Build with Gradle
+        run: |
+          # Даем права на выполнение (на всякий случай) и запускаем shadowJar
+          ./gradlew shadowJar --no-daemon
 
-      # 3. Собираем EXE через jpackage
-      - name: Create EXE Installer
+      - name: Create EXE Bundle
         shell: pwsh
         run: |
-          # Находим jar файл
-          $jar = Get-ChildItem target/*.jar | Select-Object -First 1
+          # Ищем JAR в папке build/libs
+          $jar = Get-ChildItem build/libs/Vision2XLS.jar | Select-Object -First 1
           
-          # Запускаем jpackage
-          # --input target: папка где лежит jar
-          # --main-jar: имя jar файла
-          # --app-image: создаем папку с программой, а не установщик (проще для отладки)
+          echo "Found Jar: $($jar.FullName)"
+          
           jpackage --type app-image `
-                   --input target `
+                   --input build/libs `
                    --main-jar $jar.Name `
                    --name "Vision2XLS" `
                    --main-class app.view.SimpleUi `
                    --dest output `
-                   --java-options "--enable-preview" 
-          
-          # Копируем папку bin (с llama.exe) внутрь собранного приложения
-          Copy-Item -Path "bin" -Destination "output/Vision2XLS" -Recurse
+                   --java-options "--enable-preview" `
+                   --win-console
 
-      # 4. Загружаем результат тебе в Artifacts
-      - name: Upload Build
+      - name: Copy Llama to App
+        shell: pwsh
+        run: |
+          $dest = "output/Vision2XLS/bin"
+          New-Item -ItemType Directory -Force -Path $dest
+          Copy-Item -Path "../bin-win/*" -Destination $dest -Recurse
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Vision2XLS-Windows
-          path: output/Vision2XLS
+          name: Vision2XLS-Windows-Build
+          path: Vision2XLS/output/Vision2XLS
