@@ -1,4 +1,4 @@
-name: Build Windows EXE (Gradle)
+name: Build Windows EXE (Gradle Debug)
 
 on:
   push:
@@ -7,12 +7,13 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: ./Vision2XLS
 
     steps:
       - uses: actions/checkout@v3
+      - name: List files (Debug)
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Depth 2 | Select-Object FullName
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -24,24 +25,39 @@ jobs:
       - name: Download Llama Windows
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://github.com/ggerganov/llama.cpp/releases/download/b4497/llama-b4497-bin-win-avx2-x64.zip" -OutFile "../llama-win.zip"
-          Expand-Archive -Path "../llama-win.zip" -DestinationPath "../bin-win"
+          Invoke-WebRequest -Uri "https://github.com/ggerganov/llama.cpp/releases/download/b4497/llama-b4497-bin-win-avx2-x64.zip" -OutFile "llama-win.zip"
+          Expand-Archive -Path "llama-win.zip" -DestinationPath "bin-win"
 
       - name: Build with Gradle
+        shell: pwsh
         run: |
-          # Даем права на выполнение (на всякий случай) и запускаем shadowJar
-          ./gradlew shadowJar --no-daemon
+          # Делаем файл исполняемым (на всякий случай)
+          if (Test-Path "gradlew") {
+              ./gradlew shadowJar --no-daemon
+          } else {
+              # Если gradlew нет, пробуем использовать системный gradle (но лучше иметь wrapper)
+              echo "Gradle wrapper not found, trying system gradle..."
+              gradle shadowJar --no-daemon
+          }
 
       - name: Create EXE Bundle
         shell: pwsh
         run: |
-          # Ищем JAR в папке build/libs
-          $jar = Get-ChildItem build/libs/Vision2XLS.jar | Select-Object -First 1
+          # Ищем JAR где угодно в папке build/libs (рекурсивно, на случай подпапок)
+          $jar = Get-ChildItem -Path . -Recurse -Filter "*.jar" | Where-Object { $_.FullName -like "*build\libs\*" } | Select-Object -First 1
+          
+          if ($null -eq $jar) {
+              Write-Error "JAR file not found! Check the build logs."
+              exit 1
+          }
           
           echo "Found Jar: $($jar.FullName)"
           
+          # Получаем имя папки, где лежит jar, чтобы использовать её как input
+          $inputDir = $jar.DirectoryName
+          
           jpackage --type app-image `
-                   --input build/libs `
+                   --input $inputDir `
                    --main-jar $jar.Name `
                    --name "Vision2XLS" `
                    --main-class app.view.SimpleUi `
@@ -53,11 +69,11 @@ jobs:
         shell: pwsh
         run: |
           $dest = "output/Vision2XLS/bin"
-          New-Item -ItemType Directory -Force -Path $dest
-          Copy-Item -Path "../bin-win/*" -Destination $dest -Recurse
+          if (!(Test-Path $dest)) { New-Item -ItemType Directory -Force -Path $dest }
+          Copy-Item -Path "bin-win/*" -Destination $dest -Recurse
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Vision2XLS-Windows-Build
-          path: Vision2XLS/output/Vision2XLS
+          path: output/Vision2XLS
