@@ -1,0 +1,63 @@
+name: Build Windows Exe
+
+on:
+  push:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # 1. Качаем LLAMA для WINDOWS (AVX2 версия, самая ходовая)
+      - name: Download Llama.cpp for Windows
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/ggerganov/llama.cpp/releases/download/b4497/llama-b4497-bin-win-avx2-x64.zip" -OutFile "llama.zip"
+          Expand-Archive -Path "llama.zip" -DestinationPath "bin"
+          # Также нужна модель. В GitHub Actions качать 2ГБ модель каждый раз — плохая идея (долго).
+          # Лучше, чтобы пользователь скачал её сам, либо кэшировать. 
+          # НО для теста создадим пустой файл, чтобы сборка не упала, если ты проверяешь наличие файла.
+          New-Item -Path "bin/Qwen2-VL-2B-Instruct-Q4_K_M.gguf" -ItemType File
+          New-Item -Path "bin/mmproj-Qwen2-VL-2B-Instruct-f16.gguf" -ItemType File
+
+      # 2. Собираем JAR
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      # 3. Собираем EXE через jpackage
+      - name: Create EXE Installer
+        shell: pwsh
+        run: |
+          # Находим jar файл
+          $jar = Get-ChildItem target/*.jar | Select-Object -First 1
+          
+          # Запускаем jpackage
+          # --input target: папка где лежит jar
+          # --main-jar: имя jar файла
+          # --app-image: создаем папку с программой, а не установщик (проще для отладки)
+          jpackage --type app-image `
+                   --input target `
+                   --main-jar $jar.Name `
+                   --name "Vision2XLS" `
+                   --main-class app.view.SimpleUi `
+                   --dest output `
+                   --java-options "--enable-preview" 
+          
+          # Копируем папку bin (с llama.exe) внутрь собранного приложения
+          Copy-Item -Path "bin" -Destination "output/Vision2XLS" -Recurse
+
+      # 4. Загружаем результат тебе в Artifacts
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vision2XLS-Windows
+          path: output/Vision2XLS
