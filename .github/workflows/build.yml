@@ -48,7 +48,6 @@ jobs:
           
           $inputDir = $jar.DirectoryName
           
-          # Создаем папку build/image/Vision2XLS
           jpackage --type app-image `
                    --input $inputDir `
                    --main-jar $jar.Name `
@@ -74,10 +73,8 @@ jobs:
       - name: Compile Setup.exe
         shell: pwsh
         run: |
-          # Создаем папку для вывода
           New-Item -ItemType Directory -Force -Path output
           
-          # Пишем скрипт установки (setup.iss)
           $issContent = @"
           [Setup]
           AppName=Vision2XLS
@@ -86,12 +83,11 @@ jobs:
           DefaultGroupName=Vision2XLS
           OutputDir=output
           OutputBaseFilename=Vision2XLS-Setup
-          Compression=lzma2/ultra64
+          Compression=lzma2/fast
           SolidCompression=yes
           ArchitecturesInstallIn64BitMode=x64
           
           [Files]
-          ; Берем всё из подготовленной папки и кладем в папку установки
           Source: "build\image\Vision2XLS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           
           [Icons]
@@ -104,7 +100,6 @@ jobs:
           
           Set-Content -Path "setup.iss" -Value $issContent
           
-          # Запускаем компилятор (ISCC)
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
       - name: Upload Installer
