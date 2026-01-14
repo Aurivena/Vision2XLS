@@ -1,4 +1,4 @@
-name: Build Installer (Setup.exe)
+name: Build Heavy Installer (Inno Setup)
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
         run: |
           if (Test-Path "gradlew") { ./gradlew shadowJar --no-daemon } else { gradle shadowJar --no-daemon }
 
-      - name: Create App Image
+      - name: Prepare App Folder
         shell: pwsh
         run: |
           $jar = Get-ChildItem -Path . -Recurse -Filter "*.jar" | Where-Object { $_.FullName -like "*build\libs\*" } | Select-Object -First 1
@@ -48,31 +48,64 @@ jobs:
           
           $inputDir = $jar.DirectoryName
           
-          # Сначала создаем структуру папок
+          # Создаем папку build/image/Vision2XLS
           jpackage --type app-image `
                    --input $inputDir `
                    --main-jar $jar.Name `
                    --name "Vision2XLS" `
                    --main-class app.view.SimpleUi `
                    --dest build/image `
+                   --app-version "1.0.0" `
+                   --vendor "Aurivena" `
                    --java-options "--enable-preview"
 
-      - name: Inject Models into Image
+      - name: Inject Models
         shell: pwsh
         run: |
           $dest = "build/image/Vision2XLS/bin"
           New-Item -ItemType Directory -Force -Path $dest
           Copy-Item -Path "bin-win/*" -Destination $dest -Recurse
 
-      - name: Build Setup.exe
+      - name: Install Inno Setup
         shell: pwsh
         run: |
-          jpackage --type exe `
-                   --app-image "build/image/Vision2XLS" `
-                   --name "Vision2XLS-Setup" `
-                   --dest output `
-                   --win-menu `
-                   --win-shortcut
+          choco install innosetup
+
+      - name: Compile Setup.exe
+        shell: pwsh
+        run: |
+          # Создаем папку для вывода
+          New-Item -ItemType Directory -Force -Path output
+          
+          # Пишем скрипт установки (setup.iss)
+          $issContent = @"
+          [Setup]
+          AppName=Vision2XLS
+          AppVersion=1.0.0
+          DefaultDirName={autopf}\Vision2XLS
+          DefaultGroupName=Vision2XLS
+          OutputDir=output
+          OutputBaseFilename=Vision2XLS-Setup
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64
+          
+          [Files]
+          ; Берем всё из подготовленной папки и кладем в папку установки
+          Source: "build\image\Vision2XLS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          
+          [Icons]
+          Name: "{group}\Vision2XLS"; Filename: "{app}\Vision2XLS.exe"
+          Name: "{commondesktop}\Vision2XLS"; Filename: "{app}\Vision2XLS.exe"
+          
+          [Run]
+          Filename: "{app}\Vision2XLS.exe"; Description: "Launch Vision2XLS"; Flags: nowait postinstall skipifsilent
+          "@
+          
+          Set-Content -Path "setup.iss" -Value $issContent
+          
+          # Запускаем компилятор (ISCC)
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
       - name: Upload Installer
         uses: actions/upload-artifact@v4
