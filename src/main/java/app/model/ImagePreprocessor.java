@@ -1,35 +1,26 @@
 package app.model;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class ImagePreprocessor {
-    private static final int TARGET_SIZE = 512;
+    public static File convertPdfToImage(File file) throws IOException {
+        try (PDDocument document = PDDocument.load(file)) {
+            PDFRenderer renderer = new PDFRenderer(document);
+            BufferedImage image = renderer.renderImageWithDPI(0, 130, ImageType.RGB);
 
-    public static Path resize(Path path) throws IOException {
-        BufferedImage original = ImageIO.read(path.toFile());
+            File tempFile = File.createTempFile("pdf_proc_", ".jpg");
+            tempFile.deleteOnExit();
 
-        int width = original.getWidth();
-        int height = original.getHeight();
-
-        if (width > height) {
-            height = TARGET_SIZE;
-            width = (int) ((double) original.getWidth() / original.getHeight() * height);
-        } else {
-            width = TARGET_SIZE;
-            height = (int) ((double) original.getHeight() / original.getWidth() * width);
+            ImageIO.write(image, "jpg", tempFile);
+            return tempFile;
         }
-
-        Image scaled = original.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-        BufferedImage resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        resized.getGraphics().drawImage(scaled, 0, 0, null);
-
-        Path newFile = Files.createTempFile("resized_" + path.getFileName(), ".png");
-        ImageIO.write(resized, "png", newFile.toFile());
-        return newFile;
     }
 }

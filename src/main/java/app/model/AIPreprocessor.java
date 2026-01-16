@@ -47,8 +47,8 @@ public class AIPreprocessor {
         File binDir = new File("bin");
         File binaryFile = new File(binDir, getServerBinary());
 
-        String modelName = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf";
-        String projectorName = "mmproj-Qwen2-VL-2B-Instruct-f16.gguf";
+        String modelName = "ggml-model-Q6_K.gguf";
+        String projectorName = "mmproj-model-f16.gguf";
 
         if (!binaryFile.exists()) {
             throw new IOException("Binary not found at: " + binaryFile.getAbsolutePath());
@@ -82,9 +82,9 @@ public class AIPreprocessor {
         int maxSecond = 120;
         for (int i = 0; i < maxSecond; i++) {
             try {
-                HttpURLConnection conn = (HttpURLConnection) new URL(host + ":" + port + "/health").openConnection();
-                conn.setConnectTimeout(1000);
-                conn.setReadTimeout(1000);
+                HttpURLConnection conn = (HttpURLConnection) new URL("http://" + host + ":" + port + "/health").openConnection();
+                conn.setConnectTimeout(500);
+                conn.setReadTimeout(500);
 
                 int code = conn.getResponseCode();
                 if (code == 200) return true;
@@ -93,6 +93,7 @@ public class AIPreprocessor {
 
             try {
                 Thread.sleep(1000);
+                if (i % 5 == 0) System.out.print(".");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;

@@ -18,7 +18,7 @@ javafx {
 }
 
 application {
-    mainClass.set("app.view.SimpleUi")
+    mainClass.set("app.Main")
 }
 
 dependencies {
@@ -26,9 +26,12 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
-    implementation("org.apache.poi:poi-ooxml:5.5.1")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+    implementation("org.apache.logging.log4j:log4j-api:2.22.1")
     implementation("org.apache.logging.log4j:log4j-core:2.22.1")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.20.1")
+
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+    implementation("org.apache.pdfbox:pdfbox:2.0.30")
 }
 
 tasks.test {
@@ -39,6 +42,6 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     archiveBaseName.set("Vision2XLS")
     archiveClassifier.set("")
     manifest {
-        attributes["Main-Class"] = "app.view.SimpleUi"
+        attributes["Main-Class"] = "app.Launcher"
     }
 }

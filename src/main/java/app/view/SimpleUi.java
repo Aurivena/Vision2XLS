@@ -36,11 +36,8 @@ public class SimpleUi extends Application {
     private Label statusLabel;
     private ProgressBar progressBar;
     private Label fileCountLabel;
-
-    // Модели
     private AIPreprocessor aiPreprocessor;
-    private ExcelService excelService;
-    private AIClient aiClient;
+
     private Handler handler;
 
     // Состояние
@@ -50,14 +47,10 @@ public class SimpleUi extends Application {
     private File selectedExcelFile = null;
 
     @Override
-    public void start(Stage primaryStage) throws IOException {
+    public void start(Stage primaryStage) {
         primaryStage.setTitle("Vision2XLS");
-
-        // Инициализация сервисов
-        excelService = new ExcelService();
+        handler = new Handler();
         aiPreprocessor = new AIPreprocessor();
-        aiClient = new AIClient();
-        handler = new Handler(aiClient, excelService);
 
         // --- SIDEBAR ---
         VBox sidebar = new VBox(25);
@@ -115,9 +108,13 @@ public class SimpleUi extends Application {
         sidebar.getChildren().addAll(
                 logoBox,
                 sourceHeader, selectFilesBtn, clearFilesBtn, fileCountLabel,
-                new Region() {{ setMinHeight(10); }},
+                new Region() {{
+                    setMinHeight(10);
+                }},
                 excelHeader, selectExcelBtn, excelList,
-                new Region() {{ setMinHeight(10); }},
+                new Region() {{
+                    setMinHeight(10);
+                }},
                 processBtn
         );
 
@@ -191,8 +188,8 @@ public class SimpleUi extends Application {
         // 1. Загрузка фото
         selectFilesBtn.setOnAction(e -> {
             FileChooser fc = new FileChooser();
-            fc.setTitle("Выберите изображения актов");
-            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files", "*.jpg", "*.png", "*.jpeg"));
+            fc.setTitle("Выберите файл pdf");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files", "*.jpg", "*.png", "*.jpeg","*.pdf"));
 
             List<File> files = fc.showOpenMultipleDialog(primaryStage);
             if (files != null) {
@@ -218,7 +215,7 @@ public class SimpleUi extends Application {
                 activeColumnSet.clear();
 
                 try {
-                    List<String> columns = excelService.getColumnsName(file);
+                    List<String> columns = handler.getExcelColumns(file);
                     if (!columns.isEmpty()) {
                         for (int i = 0; i < columns.size(); i++) {
                             String colName = columns.get(i);
@@ -349,6 +346,7 @@ public class SimpleUi extends Application {
         col.setMaxWidth(1f * Integer.MAX_VALUE * 0.15);
         Callback<TableColumn<ReportEntry, Void>, TableCell<ReportEntry, Void>> cellFactory = param -> new TableCell<>() {
             private final Button btn = new Button("❌");
+
             {
                 btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ef4444; -fx-font-weight: bold; -fx-cursor: hand;");
                 btn.setOnAction(event -> {
@@ -358,6 +356,7 @@ public class SimpleUi extends Application {
                     updateFileCount();
                 });
             }
+
             @Override
             public void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
@@ -397,10 +396,22 @@ public class SimpleUi extends Application {
             this.uploadTime = new SimpleStringProperty(time);
             this.status = new SimpleStringProperty(st);
         }
-        public File getFile() { return file; }
-        public String getFileName() { return fileName.get(); }
-        public String getUploadTime() { return uploadTime.get(); }
-        public String getStatus() { return status.get(); }
+
+        public File getFile() {
+            return file;
+        }
+
+        public String getFileName() {
+            return fileName.get();
+        }
+
+        public String getUploadTime() {
+            return uploadTime.get();
+        }
+
+        public String getStatus() {
+            return status.get();
+        }
     }
 
     // --- CSS ---

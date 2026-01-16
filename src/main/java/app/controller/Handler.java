@@ -13,9 +13,9 @@ public class Handler {
     private final AIClient aiClient;
     private final ExcelService excelService;
 
-    public Handler(AIClient aiClient, ExcelService excelService) {
-        this.aiClient = aiClient;
-        this.excelService = excelService;
+    public Handler() {
+        this.aiClient = new AIClient();
+        this.excelService = new ExcelService();
     }
 
     public void start(File excelFile, List<File> images, Map<Integer, String> columns) throws IOException {
@@ -26,5 +26,9 @@ public class Handler {
             }
             excelService.appendRow(excelFile, an.getData());
         }
+    }
+
+    public List<String> getExcelColumns(File excelFile) throws IOException {
+        return excelService.getColumnsName(excelFile);
     }
 }
